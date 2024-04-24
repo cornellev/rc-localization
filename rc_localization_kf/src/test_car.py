@@ -46,8 +46,8 @@ class Ackermann:
 
         
         linear_acceleration = Vector3(
-            v_dt * np.cos(theta) - (v**2 * np.cos(theta) * np.tan(psi)) / self.length,
-            v_dt * np.sin(theta) + (v**2 + np.cos(theta) * np.tan(psi)) / self.length,
+            v_dt * np.cos(theta) - (v**2 * np.sin(theta) * np.tan(psi)) / self.length,
+            v_dt * np.sin(theta) + (v**2 * np.cos(theta) * np.tan(psi)) / self.length,
             0)
         linear_acceleration_variances = np.identity(3) * 0.1
         

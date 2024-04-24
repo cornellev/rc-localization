@@ -96,16 +96,17 @@ def get_ackermann_imu_measurement_model(length, variances):
     def h(state):
         x, y, theta, psi, v, v_dt = state[0,0],state[1,0],state[2,0],state[3,0],state[4,0],state[5,0]
         return np.array([
-            [ v_dt * np.cos(theta) - (v**2 * np.cos(theta) * np.tan(psi)) / length],
-            [ v_dt * np.sin(theta) + (v**2 + np.cos(theta) * np.tan(psi)) / length],
+            [ v_dt * np.cos(theta) - (v**2 * np.sin(theta) * np.tan(psi)) / length],
+            [ v_dt * np.sin(theta) + (v**2 * np.cos(theta) * np.tan(psi)) / length],
             [ theta ]
         ])
     
     def H(state):
+        # TODO: this is wrong
         x, y, theta, psi, v, v_dt = state[0,0],state[1,0],state[2,0],state[3,0],state[4,0],state[5,0]
         return np.array([
             [ 0, 0, -v_dt * np.sin(theta) - (v**2 * np.cos(theta) * np.tan(psi)) / length, -(v**2 * np.sin(theta) * (1/np.cos(psi))**2)/length, (-2 * v * np.sin(theta) * np.tan(psi))/length, np.cos(theta)],
-            [ 0, 0, v_dt * np.cos(theta) + (v**2 * np.sin(theta) * np.tan(psi)) / length, (v**2 * np.cos(theta) * (1/np.cos(psi))**2)/length, (2 * v * np.cos(theta) * np.tan(psi)) / length, np.sin(theta)],
+            [ 0, 0, v_dt * np.cos(theta) - (v**2 * np.sin(theta) * np.tan(psi)) / length, (v**2 * np.cos(theta) * (1/np.cos(psi))**2)/length, (2 * v * np.cos(theta) * np.tan(psi)) / length, np.sin(theta)],
             [ 0, 0, 1, 0, 0, 0 ],
         ])
     
@@ -181,11 +182,12 @@ class AckermannFilter:
         self.ekf.update(np.array([ [ velocity.data ] ]), self.velocity_measurement_model)
 
     def handle_imu(self, imu):
-        _, _, theta = tf.transformations.euler_from_quaternion([ imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w ] )
-        x_accel, y_accel = imu.linear_acceleration.x, imu.linear_acceleration.y
+        if False:
+            _, _, theta = tf.transformations.euler_from_quaternion([ imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w ] )
+            x_accel, y_accel = imu.linear_acceleration.x, imu.linear_acceleration.y
 
-        z = np.array([ [x_accel], [y_accel], [theta] ])
-        self.ekf.update(z, self.imu_measurement_model)
+            z = np.array([ [x_accel], [y_accel], [theta] ])
+            self.ekf.update(z, self.imu_measurement_model)
 
 
 if __name__ == "__main__":
