@@ -14,6 +14,13 @@ const double WHEEL_DIAMETER_M = 9.5 / 100;
 const double TICKS_PER_REV = 827.2;
 const double TICKS_TO_M = (1 / TICKS_PER_REV) * (2 * M_PI * (WHEEL_DIAMETER_M / 2));
 
+std::string frame;
+std::string sensor_topic;
+std::string odom_topic;
+int pub_rate;
+std::vector<float> pose_var;
+std::vector<float> velo_var;
+
 bool first = true;
 rc_localization_odometry::SensorCollect last;
 
@@ -46,34 +53,23 @@ void data_callback(rc_localization_odometry::SensorCollect current)
     y_dot = v * std::sin(theta);
     theta_dot = v * std::tan(steer_angle) / BIKE_LENGTH;
 
-    // Don't update theta for now, at least until we switch to getting an initial estimate of theta.
     x += x_dot * dt.toSec();
     y += y_dot * dt.toSec();
     theta += theta_dot * dt.toSec();
 }
 
-void state_callback(nav_msgs::Odometry filtered)
-{
-    tf2::Quaternion q;
-    tf2::fromMsg(filtered.pose.pose.orientation, q);
-
-    tf2::Matrix3x3 m(q);
-
-    double yaw, _pitch, _roll;
-    m.getEulerYPR(yaw, _pitch, _roll);
-
-    theta = yaw;
-}
-
-nav_msgs::Odometry get_odom_packet()
+nav_msgs::Odometry build_odom_packet()
 {
     nav_msgs::Odometry odom;
 
-    odom.header.frame_id = "odom";
+    odom.header.frame_id = frame;
 
     odom.pose.pose.position.x = x;
     odom.pose.pose.position.y = y;
     odom.pose.pose.position.z = 0;
+    odom.pose.covariance[0] = pose_var[0];
+    odom.pose.covariance[7] = pose_var[1];
+    odom.pose.covariance[35] = pose_var[2];
 
     tf2::Quaternion q;
     q.setEuler(theta, 0, 0);
@@ -82,6 +78,9 @@ nav_msgs::Odometry get_odom_packet()
     odom.twist.twist.linear.x = x_dot;
     odom.twist.twist.linear.y = y_dot;
     odom.twist.twist.linear.z = 0;
+    odom.twist.covariance[0] = velo_var[0];
+    odom.twist.covariance[7] = velo_var[1];
+    odom.twist.covariance[35] = velo_var[2];
 
     odom.twist.twist.angular.z = theta_dot;
 
@@ -92,26 +91,32 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "odometry_node");
 
-    ros::NodeHandle nh;
+    ros::NodeHandle nh("~");
 
-    ros::Subscriber s1 = nh.subscribe("/sensor_collect", 5, data_callback);
-    ros::Subscriber s2 = nh.subscribe("/odometry/filtered", 5, state_callback);
+    nh.getParam("frame", frame);
+    nh.getParam("sensor_topic", sensor_topic);
+    nh.getParam("odom_topic", odom_topic);
+    nh.getParam("publish_rate", pub_rate);
+    nh.getParam("pose_variance", pose_var);
+    nh.getParam("velo_variance", velo_var);
 
-    ros::Publisher odom_publish = nh.advertise<nav_msgs::Odometry>("/odometry", 1);
+    ros::Subscriber sub = nh.subscribe(sensor_topic, 5, data_callback);
 
-    ros::Rate rate = ros::Rate(100);
+    ros::Publisher odom_publish = nh.advertise<nav_msgs::Odometry>(odom_topic, 1);
+
+    ros::Rate rate = ros::Rate(pub_rate);
     ros::Time last = ros::Time::now();
 
     while (ros::ok())
     {
+        ros::spinOnce();
+
         ros::Time now = ros::Time::now();
         if (now - last > rate.expectedCycleTime())
         {
             last = now;
-            auto msg = get_odom_packet();
+            auto msg = build_odom_packet();
             odom_publish.publish(msg);
         }
-
-        ros::spinOnce();
     }
 }
