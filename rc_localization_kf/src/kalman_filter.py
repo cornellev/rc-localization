@@ -182,12 +182,11 @@ class AckermannFilter:
         self.ekf.update(np.array([ [ velocity.data ] ]), self.velocity_measurement_model)
 
     def handle_imu(self, imu):
-        if False:
-            _, _, theta = tf.transformations.euler_from_quaternion([ imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w ] )
-            x_accel, y_accel = imu.linear_acceleration.x, imu.linear_acceleration.y
+        _, _, theta = tf.transformations.euler_from_quaternion([ imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w ] )
+        x_accel, y_accel = imu.linear_acceleration.x, imu.linear_acceleration.y
 
-            z = np.array([ [x_accel], [y_accel], [theta] ])
-            self.ekf.update(z, self.imu_measurement_model)
+        z = np.array([ [x_accel], [y_accel], [theta] ])
+        self.ekf.update(z, self.imu_measurement_model)
 
 
 if __name__ == "__main__":
