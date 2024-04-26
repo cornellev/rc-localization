@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 import rospy
 import numpy as np
-from std_msgs.msg import Float32, Header
+from std_msgs.msg import Float64, Header
 from sensor_msgs.msg import Imu
-from geometry_msgs.msg import PoseStamped, Pose, Quaternion, Point
+from geometry_msgs.msg import PoseStamped, Pose, Quaternion, Point,TransformStamped
 import tf
 import tf.transformations
-
+import tf2_ros
 
 class MotionModel:
     def __init__(self, f, Q, F, L):
@@ -153,7 +153,7 @@ class AckermannFilter:
         self.imu_measurement_model = get_ackermann_imu_measurement_model(length, np.array([ 0.1, 0.1, 0.1]))
 
         self.last_predict_time = None
-        rospy.Subscriber("/velocity", data_class=Float32, callback=self.handle_velocity)
+        rospy.Subscriber("/velocity", data_class=Float64, callback=self.handle_velocity)
         rospy.Subscriber("/imu", data_class=Imu, callback=self.handle_imu)
 
         self.odom_pub = rospy.Publisher("/odom", data_class=PoseStamped, queue_size=10)
@@ -178,10 +178,31 @@ class AckermannFilter:
         self.odom_pub.publish(PoseStamped(header, pose))
 
 
+    def broadcast_transforms(self):
+        print("running broadcast trasnforms")
+        
+        br = tf2_ros.TransformBroadcaster()
+        t = TransformStamped()
+        
+        t.header.stamp = rospy.Time.now()
+        t.header.frame_id = "odom"
+        t.child_frame_id = "base_link"
+        t.transform.translation.x = self.ekf.x[0,0]
+        t.transform.translation.y = self.ekf.x[1,0]
+        t.transform.translation.z = 0.0
+        q = tf.transformations.quaternion_from_euler(0, 0, self.ekf.x[2,0])
+        t.transform.rotation.x = q[0]
+        t.transform.rotation.y = q[1]
+        t.transform.rotation.z = q[2]
+        t.transform.rotation.w = q[3]
+    
+        br.sendTransform(t)
+
     def handle_velocity(self, velocity):
         self.ekf.update(np.array([ [ velocity.data ] ]), self.velocity_measurement_model)
 
     def handle_imu(self, imu):
+        rospy.loginfo(imu)
         _, _, theta = tf.transformations.euler_from_quaternion([ imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w ] )
         x_accel, y_accel = imu.linear_acceleration.x, imu.linear_acceleration.y
 
@@ -199,4 +220,5 @@ if __name__ == "__main__":
     while not rospy.is_shutdown():
         ackermann_filter.predict()
         ackermann_filter.publish_odom()
+        ackermann_filter.broadcast_transforms()
         rate.sleep()
