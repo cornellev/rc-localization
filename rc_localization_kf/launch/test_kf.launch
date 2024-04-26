@@ -1,0 +1,18 @@
+<launch>
+    <node name="test_car" pkg="rc_localization_kf" type="test_car.py">
+    </node>
+
+    <node name="kf" pkg="rc_localization_kf" type="kalman_filter.py">
+    </node>
+
+    <node name="odom_map_publisher" pkg="tf2_ros" type="static_transform_publisher" 
+        args="0 0 0 0 0 0 map odom">
+    </node>
+
+    <node name="base_link_imu_publisher" pkg="tf2_ros" type="static_transform_publisher" 
+        args="0 0 0 0 0 0 base_link imu">
+    </node>
+
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find rc_localization_kf)/rviz/config.rviz" />
+    <node name="rqt_gui" pkg="rqt_gui" type="rqt_gui"/>
+</launch>
