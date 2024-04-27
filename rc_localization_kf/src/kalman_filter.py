@@ -219,11 +219,11 @@ class AckermannFilter:
         br.sendTransform(t)
 
     def handle_velocity(self, velocity):
-        # if True: return
+        if True: return
         self.ekf.update(np.array([ [ velocity.data ] ]), self.velocity_measurement_model)
 
     def handle_imu(self, imu):
-        if True: return
+        # if True: return
         rospy.loginfo(imu)
         _, _, theta = tf.transformations.euler_from_quaternion([ imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w ] )
         x_accel, y_accel = imu.linear_acceleration.x, imu.linear_acceleration.y
@@ -232,7 +232,7 @@ class AckermannFilter:
         self.ekf.update(z, self.imu_measurement_model)
 
     def handle_steer(self, steer):
-        # if True: return
+        if True: return
         self.ekf.update(np.array([ [ steer.data ] ]), self.steer_measurement_model)
 
 
