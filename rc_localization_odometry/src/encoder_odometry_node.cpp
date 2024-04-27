@@ -10,9 +10,6 @@
 #include <rc_localization_odometry/SensorCollect.h>
 
 const double BIKE_LENGTH = 19.0 / 100;
-const double WHEEL_DIAMETER_M = 9.5 / 100;
-const double TICKS_PER_REV = 827.2;
-const double TICKS_TO_M = (1 / TICKS_PER_REV) * (2 * M_PI * (WHEEL_DIAMETER_M / 2));
 
 std::string frame;
 std::string sensor_topic;
@@ -24,7 +21,6 @@ std::vector<float> velo_var;
 bool first = true;
 rc_localization_odometry::SensorCollect last;
 
-double steer_angle = 0.0;
 double x, y, theta, x_dot, y_dot, theta_dot = 0;
 
 void data_callback(rc_localization_odometry::SensorCollect current)
@@ -38,20 +34,15 @@ void data_callback(rc_localization_odometry::SensorCollect current)
 
     ros::Duration dt = ros::Duration((current.timestamp - last.timestamp) / 1000.0);
 
-    double current_avg = (current.encoder_left + current.encoder_right) / 2.0;
-    double last_avg = (last.encoder_left + last.encoder_right) / 2.0;
-    double delta_enc = current_avg - last_avg;
-    double delta_enc_m = TICKS_TO_M * delta_enc;
-
     last = current;
 
-    double v = delta_enc_m / dt.toSec();
+    double velocity = current.velocity;
     double steer_angle = current.steering_angle;
 
     // should be new theta?
-    x_dot = v * std::cos(theta);
-    y_dot = v * std::sin(theta);
-    theta_dot = v * std::tan(steer_angle) / BIKE_LENGTH;
+    x_dot = velocity * std::cos(theta);
+    y_dot = velocity * std::sin(theta);
+    theta_dot = velocity * std::tan(steer_angle) / BIKE_LENGTH;
 
     x += x_dot * dt.toSec();
     y += y_dot * dt.toSec();

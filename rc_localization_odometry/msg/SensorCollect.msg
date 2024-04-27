@@ -1,4 +1,3 @@
-uint32   timestamp
-int32    encoder_left
-int32    encoder_right
-float32  steering_angle
+uint32 timestamp
+float64 velocity
+float64 steering_angle
