@@ -14,11 +14,11 @@ class Ackermann:
 
         self.velocity_pub = rospy.Publisher(name="/velocity", data_class=Float64, queue_size=10)
         self.imu_pub = rospy.Publisher(name="/imu", data_class=Imu, queue_size=10)
-
+        self.steer_pub = rospy.Publisher(name="/steer", data_class=Float64, queue_size=10)
 
         rospy.Subscriber(name="/speed_controller/command", data_class=Float64, callback=self.handle_speed_command)
         rospy.Subscriber(name="/steer_controller/command", data_class=Float64, callback=self.handle_steer_command)
-        
+
         self.truth_pub = rospy.Publisher(name="/truth", data_class=PoseStamped, queue_size=10)
 
     def handle_steer_command(self, steer_command):
@@ -44,6 +44,10 @@ class Ackermann:
     def upload_velocity_data(self):
         self.velocity_pub.publish(Float64(self.state[4,0]))
 
+    def update_odom_sensors(self):
+        self.upload_velocity_data()
+        self.upload_steer_data()
+
     def upload_imu_data(self):
         x, y, theta, psi, v, v_dt = self.state[0,0],self.state[1,0],self.state[2,0],self.state[3,0],self.state[4,0],self.state[5,0]
         orientation_array = tf.transformations.quaternion_from_euler(0, 0, theta)
@@ -68,7 +72,10 @@ class Ackermann:
             orientation, orientation_variances.flatten().tolist(), 
             angular_velocity, angular_velocity_variances.flatten().tolist(), 
             linear_acceleration, linear_acceleration_variances.flatten().tolist()))
-        
+    
+    def upload_steer_data(self):
+        self.steer_pub.publish(Float64(self.state[3,0]))
+
     def upload_truth(self):
         x, y, theta, psi, v, v_dt = self.state[0,0],self.state[1,0],self.state[2,0],self.state[3,0],self.state[4,0],self.state[5,0]
         header = Header()
@@ -86,7 +93,7 @@ if __name__ == "__main__":
     hz = 250.0
     rate = rospy.Rate(hz)
     
-    velocity_looper = rospy.Timer(rospy.Duration(nsecs=5_000_000), lambda _: ackermann.upload_velocity_data())
+    odom_sensor_looper = rospy.Timer(rospy.Duration(nsecs=5_000_000), lambda _: ackermann.update_odom_sensors())
     imu_looper = rospy.Timer(rospy.Duration(nsecs=20_000_000), lambda _: ackermann.upload_imu_data())
 
     while not rospy.is_shutdown():
@@ -94,7 +101,7 @@ if __name__ == "__main__":
         ackermann.upload_truth()
         rate.sleep()
 
-    velocity_looper.shutdown()
+    odom_sensor_looper.shutdown()
     imu_looper.shutdown()
 
     # rospy.spin()

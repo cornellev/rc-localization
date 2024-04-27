@@ -43,11 +43,12 @@ class ExtendedKalmanFilter:
         M_k = measurement_model.M()
         R_k = measurement_model.R()
 
-        self.K = self.P @ H_k.T @ np.linalg.inv(H_k @ self.P @ H_k.T + M_k @ R_k @ M_k.T)
-        self.x = self.x + self.K @ (measurement - measurement_model.h(self.x))
+        K = self.P @ H_k.T @ np.linalg.inv(H_k @ self.P @ H_k.T + M_k @ R_k @ M_k.T)
+        self.x = self.x + K @ (measurement - measurement_model.h(self.x))
         
-        KH = self.K @ H_k
-        self.P = (np.identity(KH.shape[0]) - KH) @ self.P
+        KH = K @ H_k
+        I_KH = np.identity(KH.shape[0]) - KH
+        self.P = I_KH @ self.P # I_KH @ self.P @ I_KH.T + K @ R_k @ K.T
 
 def get_ackermann_motion_model(length, variances):
 
@@ -141,6 +142,25 @@ def get_ackermann_velocity_measurement_model(variance):
     
     return MeasurementModel(h, R, H, M)
 
+def get_ackermann_steer_measurement_model(variance):
+    def h(state):
+        x, y, theta, psi, v, v_dt = state[0,0],state[1,0],state[2,0],state[3,0],state[4,0],state[5,0]
+        return np.array([
+            [ psi ]
+        ])
+    
+    def H(state):
+        x, y, theta, psi, v, v_dt = state[0,0],state[1,0],state[2,0],state[3,0],state[4,0],state[5,0]
+        return np.array([[ 0, 0, 0, 1, 0, 0 ]])
+    
+    def M():
+        return np.identity(1)
+    
+    def R():
+        return np.array([ [ variance ] ])
+    
+    return MeasurementModel(h, R, H, M)
+
 class AckermannFilter:
     def __init__(self):
         length = 0.3
@@ -151,10 +171,12 @@ class AckermannFilter:
 
         self.velocity_measurement_model = get_ackermann_velocity_measurement_model(0.25)
         self.imu_measurement_model = get_ackermann_imu_measurement_model(length, np.array([ 0.1, 0.1, 0.1]))
+        self.steer_measurement_model = get_ackermann_steer_measurement_model(0.25)
 
         self.last_predict_time = None
         rospy.Subscriber("/velocity", data_class=Float64, callback=self.handle_velocity)
         rospy.Subscriber("/imu", data_class=Imu, callback=self.handle_imu)
+        rospy.Subscriber("/steer", data_class=Float64, callback=self.handle_steer)
 
         self.odom_pub = rospy.Publisher("/odom", data_class=PoseStamped, queue_size=10)
 
@@ -179,8 +201,6 @@ class AckermannFilter:
 
 
     def broadcast_transforms(self):
-        print("running broadcast trasnforms")
-        
         br = tf2_ros.TransformBroadcaster()
         t = TransformStamped()
         
@@ -199,15 +219,21 @@ class AckermannFilter:
         br.sendTransform(t)
 
     def handle_velocity(self, velocity):
+        # if True: return
         self.ekf.update(np.array([ [ velocity.data ] ]), self.velocity_measurement_model)
 
     def handle_imu(self, imu):
+        if True: return
         rospy.loginfo(imu)
         _, _, theta = tf.transformations.euler_from_quaternion([ imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w ] )
         x_accel, y_accel = imu.linear_acceleration.x, imu.linear_acceleration.y
 
         z = np.array([ [x_accel], [y_accel], [theta] ])
         self.ekf.update(z, self.imu_measurement_model)
+
+    def handle_steer(self, steer):
+        # if True: return
+        self.ekf.update(np.array([ [ steer.data ] ]), self.steer_measurement_model)
 
 
 if __name__ == "__main__":
