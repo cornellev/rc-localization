@@ -20,7 +20,7 @@
       <param name="Icp/VoxelSize"            type="string" value="0.05"/>
 
       <remap from="scan" to="/scan"/>
-      <remap from="odom" to="/rtabmap/odom/odom"/>
+      <remap from="odom" to="/odometry/filtered"/>
       <!-- <param name="subscribe_odom_info" type="bool" value="true"/> -->
 
       <!-- localization mode -->
