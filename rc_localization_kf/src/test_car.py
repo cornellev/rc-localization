@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import rospy
-from std_msgs.msg import Float64, Header
+from std_msgs.msg import Float64, Header, UInt32
 from sensor_msgs.msg import Imu
 from geometry_msgs.msg import Quaternion, Vector3, PoseStamped, Pose, Point
 import numpy as np
@@ -8,30 +8,27 @@ import tf
 import tf.transformations
 import tf2_ros
 
-
-from rc_localization_odometry.msg import SensorCollect
-
 class Ackermann:
     def __init__(self, state, length):
         self.length = length
         self.state = state
 
-        self.velocity_pub = rospy.Publisher(name="/velocity", data_class=Float64, queue_size=10)
         self.imu_pub = rospy.Publisher(name="/imu", data_class=Imu, queue_size=10)
-        self.steer_pub = rospy.Publisher(name="/steer", data_class=Float64, queue_size=10)
-        # self.sensor_collect_pub = rospy.Publisher(name="/sensor_collect", data_class=SensorCollect, queue_size=10)
 
         rospy.Subscriber(name="/speed_controller/command", data_class=Float64, callback=self.handle_speed_command)
         rospy.Subscriber(name="/steer_controller/command", data_class=Float64, callback=self.handle_steer_command)
 
+        self.velocity_pub = rospy.Publisher(name="/velocity", data_class=Float64, queue_size=10)
+        self.steering_angle_pub = rospy.Publisher(name="/steering_angle", data_class=Float64, queue_size=10)
+        
         self.truth_pub = rospy.Publisher(name="/truth", data_class=PoseStamped, queue_size=10)
 
     def handle_steer_command(self, steer_command):
         self.state[3,0] = steer_command.data
 
     def handle_speed_command(self, speed_command):
-        # self.state[5,0] = speed_command.data
-        self.state[4,0] = speed_command.data
+        self.state[5,0] = speed_command.data
+        # self.state[4,0] = speed_command.data
 
     def get_next_state(self, dT):
         x, y, theta, psi, v, v_dt = self.state[0,0],self.state[1,0],self.state[2,0],self.state[3,0],self.state[4,0],self.state[5,0]
@@ -47,12 +44,9 @@ class Ackermann:
     def update(self, dT):
         self.state = self.get_next_state(dT)
 
-    def upload_velocity_data(self):
+    def upload_sensor_data(self):
         self.velocity_pub.publish(Float64(self.state[4,0]))
-
-    def update_odom_sensors(self):
-        self.upload_velocity_data()
-        self.upload_steer_data()
+        self.steering_angle_pub.publish(Float64(self.state[3,0]))
 
     def upload_imu_data(self):
         x, y, theta, psi, v, v_dt = self.state[0,0],self.state[1,0],self.state[2,0],self.state[3,0],self.state[4,0],self.state[5,0]
@@ -97,7 +91,7 @@ if __name__ == "__main__":
     hz = 250.0
     rate = rospy.Rate(hz)
     
-    odom_sensor_looper = rospy.Timer(rospy.Duration(nsecs=5_000_000), lambda _: ackermann.update_odom_sensors())
+    odom_sensor_looper = rospy.Timer(rospy.Duration(nsecs=5_000_000), lambda _: ackermann.upload_sensor_data())
     imu_looper = rospy.Timer(rospy.Duration(nsecs=20_000_000), lambda _: ackermann.upload_imu_data())
 
     while not rospy.is_shutdown():
