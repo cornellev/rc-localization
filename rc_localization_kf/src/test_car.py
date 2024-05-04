@@ -6,6 +6,10 @@ from geometry_msgs.msg import Quaternion, Vector3, PoseStamped, Pose, Point
 import numpy as np
 import tf
 import tf.transformations
+import tf2_ros
+
+
+from rc_localization_odometry.msg import SensorCollect
 
 class Ackermann:
     def __init__(self, state, length):
@@ -15,6 +19,7 @@ class Ackermann:
         self.velocity_pub = rospy.Publisher(name="/velocity", data_class=Float64, queue_size=10)
         self.imu_pub = rospy.Publisher(name="/imu", data_class=Imu, queue_size=10)
         self.steer_pub = rospy.Publisher(name="/steer", data_class=Float64, queue_size=10)
+        # self.sensor_collect_pub = rospy.Publisher(name="/sensor_collect", data_class=SensorCollect, queue_size=10)
 
         rospy.Subscriber(name="/speed_controller/command", data_class=Float64, callback=self.handle_speed_command)
         rospy.Subscriber(name="/steer_controller/command", data_class=Float64, callback=self.handle_steer_command)
@@ -25,7 +30,8 @@ class Ackermann:
         self.state[3,0] = steer_command.data
 
     def handle_speed_command(self, speed_command):
-        self.state[5,0] = speed_command.data
+        # self.state[5,0] = speed_command.data
+        self.state[4,0] = speed_command.data
 
     def get_next_state(self, dT):
         x, y, theta, psi, v, v_dt = self.state[0,0],self.state[1,0],self.state[2,0],self.state[3,0],self.state[4,0],self.state[5,0]
@@ -50,23 +56,22 @@ class Ackermann:
 
     def upload_imu_data(self):
         x, y, theta, psi, v, v_dt = self.state[0,0],self.state[1,0],self.state[2,0],self.state[3,0],self.state[4,0],self.state[5,0]
+
+        header = Header()
+        header.stamp = rospy.Time.now()
+        header.frame_id= "imu"
+
+        # orientation_array = tf.transformations.quaternion_from_euler(0, 0, theta)
         orientation_array = tf.transformations.quaternion_from_euler(0, 0, theta)
         orientation = Quaternion(x=orientation_array[0], y=orientation_array[1], z=orientation_array[2], w=orientation_array[3])
         orientation_variances = np.identity(3)
 
-        angular_velocity = Vector3()
-        angular_velocity_variances = np.zeros((3,3))
+        angular_velocity = Vector3(0, 0, 0)
+        angular_velocity_variances = np.ones((3,3)) * -1 # use negative covariances for disabled value
 
-        
-        linear_acceleration = Vector3(
-            v * -np.sin(theta), # - (v**2 * np.sin(theta) * np.tan(psi)) / self.length,
-            v * np.cos(theta), # + (v**2 * np.cos(theta) * np.tan(psi)) / self.length,
-            0)
+        linear_acceleration = Vector3(v_dt, v**2 * np.tan(psi) / self.length, 0)
         linear_acceleration_variances = np.identity(3) * 0.1
         
-        header = Header()
-        header.stamp = rospy.Time.now()
-        header.frame_id= "imu"
         self.imu_pub.publish(Imu(
             header,
             orientation, orientation_variances.flatten().tolist(), 
@@ -83,7 +88,6 @@ class Ackermann:
         header.stamp = rospy.Time.now()
         pose = Pose(Point(x, y, 0), Quaternion(*tf.transformations.quaternion_from_euler(0, 0, theta)))
         self.truth_pub.publish(PoseStamped(header, pose))
-
 
 if __name__ == "__main__":
     rospy.init_node("test_car")
@@ -104,4 +108,4 @@ if __name__ == "__main__":
     odom_sensor_looper.shutdown()
     imu_looper.shutdown()
 
-    # rospy.spin()
+    rospy.spin()
