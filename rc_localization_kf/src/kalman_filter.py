@@ -176,9 +176,9 @@ class AckermannFilter:
         self.last_predict_time = None
         self.odom_pub = rospy.Publisher("/odom", data_class=PoseStamped, queue_size=10)
 
-        # rospy.Subscriber("/imu", data_class=Imu, callback=self.handle_imu)
-        rospy.Subscriber("/velocity", data_class=Float64, callback=self.handle_velocity)
-        rospy.Subscriber("/steering_angle", data_class=Float64, callback=self.handle_steering_angle)
+        rospy.Subscriber("/imu", data_class=Imu, callback=self.handle_imu)
+        # rospy.Subscriber("/velocity", data_class=Float64, callback=self.handle_velocity)
+        # rospy.Subscriber("/steering_angle", data_class=Float64, callback=self.handle_steering_angle)
 
     def predict(self):
         if self.last_predict_time is None:
@@ -226,7 +226,7 @@ class AckermannFilter:
     def handle_imu(self, imu):
         _, _, theta = tf.transformations.euler_from_quaternion([ imu.orientation.x, imu.orientation.y, imu.orientation.z, imu.orientation.w ] )
         a_T, a_C = imu.linear_acceleration.x, imu.linear_acceleration.y
-
+        
         z = np.array([ [a_T], [a_C], [theta] ])
         self.ekf.update(z, self.imu_measurement_model)
 
