@@ -1,0 +1,3 @@
+a 'glitch' happens everytime the orientation of the imu data crosses 0
+accelerating while turning causes the 'glitching'
+without accelerating (just turning in place) causes no translational motion (only orientation changes)
